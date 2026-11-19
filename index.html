@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- Login / Sign Up screen -->
+  <div class="login-screen" id="login-screen">
+    <section class="window login-window">
+      <div class="titlebar">
+        <span class="lights"><i class="fill"></i><i></i><i></i></span>
+        <b id="auth-title">Log In</b>
+        <button type="button" class="btn tiny back-btn hidden" id="auth-back" aria-label="Back">←</button>
+      </div>
+      <div class="login-body">
+        <!-- VIEW 1: Log In -->
+        <form id="login-form" class="auth-form">
+          <div class="field">
+            <label for="login-email">Email</label>
+            <input type="email" id="login-email" autocomplete="email" required placeholder="you@example.com">
+          </div>
+          <div class="field">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" autocomplete="current-password" required placeholder="••••••••">
+          </div>
+          <div class="field-row">
+            <label class="check-label">
+              <input type="checkbox" id="remember-me" class="check" checked>
+              <span>Remember me</span>
+            </label>
+            <a href="#" class="text-link" id="forgot-link">Forgot password?</a>
+          </div>
+          <p class="error hidden" id="auth-error"></p>
+          <button type="submit" class="btn send full-width" id="login-submit">Log In</button>
+          <p class="hint center auth-footer">Don't have an account? <a href="#" class="text-link" id="switch-signup">Sign Up</a></p>
+        </form>
+
+        <!-- VIEW 2: Sign Up -->
+        <form id="signup-form" class="auth-form hidden">
+          <div class="field">
+            <label for="signup-first">First Name</label>
+            <input type="text" id="signup-first" autocomplete="given-name" required placeholder="Jane">
+          </div>
+          <div class="field">
+            <label for="signup-last">Last Name</label>
+            <input type="text" id="signup-last" autocomplete="family-name" required placeholder="Doe">
+          </div>
+          <div class="field">
+            <label for="signup-email">Email</label>
+            <input type="email" id="signup-email" autocomplete="email" required placeholder="you@example.com">
+          </div>
+          <div class="field">
+            <label for="signup-password">Password</label>
+            <input type="password" id="signup-password" autocomplete="new-password" required placeholder="••••••••">
+          </div>
+          <div class="field">
+            <label for="signup-confirm">Confirm Password</label>
+            <input type="password" id="signup-confirm" autocomplete="new-password" required placeholder="••••••••">
+          </div>
+          <p class="error hidden" id="auth-error"></p>
+          <button type="submit" class="btn send full-width" id="signup-submit">Sign Up</button>
+          <p class="hint center auth-footer">Already have an account? <a href="#" class="text-link" id="switch-login">Log In</a></p>
+        </form>
+
+        <!-- VIEW 3: Forgot Password -->
+        <form id="forgot-form" class="auth-form hidden">
+          <p class="hint center" style="margin-bottom: 16px;">Enter your email and we'll send a reset link.</p>
+          <div class="field">
+            <label for="forgot-email">Email</label>
+            <input type="email" id="forgot-email" autocomplete="email" required placeholder="you@example.com">
+          </div>
+          <p class="error hidden" id="auth-error"></p>
+          <button type="submit" class="btn send full-width" id="forgot-submit">Send reset link</button>
+          <p class="hint center auth-footer"><a href="#" class="text-link" id="forgot-back">Back to Log In</a></p>
+        </form>
+
+        <!-- VIEW 4: New Password (after reset link) -->
+        <form id="reset-form" class="auth-form hidden">
+          <p class="hint center" style="margin-bottom: 16px;">Enter your new password.</p>
+          <div class="field">
+            <label for="reset-password">New Password</label>
+            <input type="password" id="reset-password" autocomplete="new-password" required placeholder="••••••••">
+          </div>
+          <div class="field">
+            <label for="reset-confirm">Confirm New Password</label>
+            <input type="password" id="reset-confirm" autocomplete="new-password" required placeholder="••••••••">
+          </div>
+          <p class="error hidden" id="auth-error"></p>
+          <button type="submit" class="btn send full-width" id="reset-submit">Update Password</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <!-- Planner app -->
+  <div class="desktop" id="app" style="display: none;">
+    <div class="left-col">
+      <section class="window small">
+        <div class="titlebar">
+          <span class="lights"><i class="fill"></i><i></i><i></i></span>
+          <b id="month-title">Month</b>
+        </div>
+        <div class="small-body">
+          <div class="week-nav">
+            <button class="btn tiny" id="prev-month" aria-label="Previous month">‹</button>
+            <button class="btn tiny" id="today-btn">Today</button>
+            <button class="btn tiny" id="next-month" aria-label="Next month">›</button>
+          </div>
+          <div class="weekdays" id="weekdays"></div>
+          <div class="days" id="days"></div>
+          <p class="hint center">Tap a day to see what's due. Tap again to clear.</p>
+        </div>
+      </section>
+
+      <section class="window small">
+        <div class="titlebar">
+          <span class="lights"><i class="fill"></i><i></i><i></i></span>
+          <b>Focus</b>
+        </div>
+        <div class="small-body">
+          <div class="modes">
+            <button class="mode active" data-min="25">Focus</button>
+            <button class="mode" data-min="5">Short</button>
+            <button class="mode" data-min="15">Long</button>
+          </div>
+          <div class="time" id="time">25:00</div>
+          <div class="timer-btns">
+            <button class="btn" id="start">Start</button>
+            <button class="btn" id="reset">Reset</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="window main">
+        <div class="titlebar">
+          <span class="lights"><i class="fill"></i><i></i><i></i></span>
+          <b>Planner</b>
+          <div class="user-info" id="user-info" style="position: absolute; right: 50px; top: 50%; transform: translateY(-50%);"></div>
+        </div>
+        <div class="body">
+          <aside class="sidebar">
+            <div class="toolbar">
+              <button id="add-subject" class="btn">+ New subject</button>
+            </div>
+            <div class="side-scroll scroll">
+              <button class="nav" id="nav-all">
+                <span>All tasks</span><em class="badge" id="badge-all"></em>
+              </button>
+              <div class="folder"><span class="minus"></span> Subjects</div>
+              <ul class="tree" id="subjects"></ul>
+              <p class="hint" id="no-subjects">Press "+ New subject" to add your first one.</p>
+            </div>
+          </aside>
+
+          <div class="pane">
+            <div class="pane-head">
+              <b id="pane-title"># All tasks</b>
+              <span class="stat" id="pane-stat"></span>
+              <button class="btn small" id="del-subject">Delete</button>
+            </div>
+            <ul id="task-list" class="scroll"></ul>
+            <p class="empty" id="empty">Nothing here yet ✿</p>
+            <form id="task-form">
+              <input type="text" id="task-input" placeholder="Add a task..." autocomplete="off" required>
+              <select id="task-pri" aria-label="Priority">
+                <option value="low">Low</option>
+                <option value="mid" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+              <input type="date" id="task-due" aria-label="Due date">
+              <button type="submit" class="btn send">Add</button>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+  <script src="script.js"></script>
+</body>
+</html>
