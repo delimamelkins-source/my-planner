@@ -434,7 +434,7 @@ $('login-form').addEventListener('submit', async (e) => {
 });
 
 $('forgot-link').onclick = (e) => { e.preventDefault(); showAuthForm('forgot-form'); };
-$('#switch-signup').onclick = (e) => { e.preventDefault(); showAuthForm('signup-form'); };
+$('switch-signup').onclick = (e) => { e.preventDefault(); showAuthForm('signup-form'); };
 
 // Sign Up form
 $('signup-form').addEventListener('submit', async (e) => {
@@ -473,7 +473,7 @@ $('signup-form').addEventListener('submit', async (e) => {
   btn.disabled = false;
 });
 
-$('#switch-login').onclick = (e) => { e.preventDefault(); showAuthForm('login-form'); };
+$('switch-login').onclick = (e) => { e.preventDefault(); showAuthForm('login-form'); };
 
 // Forgot Password form
 $('forgot-form').addEventListener('submit', async (e) => {
@@ -500,7 +500,7 @@ $('forgot-form').addEventListener('submit', async (e) => {
   btn.disabled = false;
 });
 
-$('#forgot-back').onclick = (e) => { e.preventDefault(); showAuthForm('login-form'); };
+$('forgot-back').onclick = (e) => { e.preventDefault(); showAuthForm('login-form'); };
 
 // Reset Password form (after clicking link in email)
 $('reset-form').addEventListener('submit', async (e) => {
