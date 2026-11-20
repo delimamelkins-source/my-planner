@@ -132,7 +132,13 @@
           <div class="timer-display">
             <div class="time-wrapper">
               <button class="btn tiny timer-adj" id="timer-dec" aria-label="Decrease time" title="Decrease">−</button>
-              <span class="time" id="time" tabindex="0" role="button" aria-label="Tap to edit time">25:00</span>
+              <div class="time" id="time" role="group" aria-label="Timer length">
+                <div class="seg"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" id="t-h" value="00" aria-label="Hours"><label for="t-h">hr</label></div>
+                <span class="colon">:</span>
+                <div class="seg"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" id="t-m" value="25" aria-label="Minutes"><label for="t-m">min</label></div>
+                <span class="colon">:</span>
+                <div class="seg"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" id="t-s" value="00" aria-label="Seconds"><label for="t-s">sec</label></div>
+              </div>
               <button class="btn tiny timer-adj" id="timer-inc" aria-label="Increase time" title="Increase">+</button>
             </div>
             <div class="progress-wrap" aria-hidden="true"><div class="progress-bar" id="progress-bar"></div></div>

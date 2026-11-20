@@ -164,32 +164,21 @@ li.done .t-text { text-decoration: line-through; color: var(--grey); }
 
 .timer-display { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; }
 .time-wrapper { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.time {
-  font-size: clamp(2.5rem, 10vw, 4rem); font-weight: 900; text-align: center;
-  min-width: 140px; letter-spacing: 1px; user-select: none; cursor: pointer;
-  background: var(--cream); border: 3px solid var(--ink); border-radius: 12px;
-  padding: 8px 16px; box-shadow: inset 3px 3px 0 var(--ink);
-  transition: box-shadow .1s, border-color .1s;
-}
-.time.long-format { font-size: clamp(1.8rem, 8vw, 3rem); }
-.time:focus, .time:hover { outline: none; box-shadow: inset 3px 3px 0 var(--ink), 0 0 0 3px var(--green); border-color: var(--green); }
-.time.editing { cursor: text; box-shadow: inset 3px 3px 0 var(--ink), 0 0 0 3px var(--green); }
+.time { display: flex; align-items: flex-start; justify-content: center; gap: 4px; margin: 6px 0 10px; }
+.time .seg { display: flex; flex-direction: column; align-items: center; }
 .time input {
-  width: 100%; border: none; background: transparent; font: inherit;
-  font-size: inherit; font-weight: 900; text-align: center; color: var(--ink);
-  letter-spacing: 1px; outline: none;
+  width: 1.7em; font-family: inherit; font-weight: 900; font-size: clamp(2.2rem, 8vh, 3.6rem);
+  text-align: center; color: var(--ink); background: transparent;
+  border: 3px solid transparent; border-radius: 10px; padding: 0; line-height: 1.15;
 }
-
-/* Time edit mode - 3 inputs: h, m, s */
-.time-edit { display: flex; align-items: center; gap: 4px; }
-.time-edit-field { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.time-edit-field input {
-  width: 56px; height: 56px; font-size: 1.5rem; font-weight: 900; text-align: center;
-  border: 3px solid var(--ink); border-radius: 10px; background: #fff; color: var(--ink);
-  font-family: inherit; outline: none;
+.time input:hover:not(:disabled) { border-color: var(--grey); cursor: text; }
+.time input:focus { outline: none; background: #fff; border-color: var(--ink); }
+.time input:disabled { opacity: 1; -webkit-text-fill-color: var(--ink); cursor: default; }
+.time label { font-size: .7rem; color: var(--grey); margin-top: 2px; }
+.time .colon { font-size: clamp(2rem, 7vh, 3.2rem); font-weight: 900; line-height: 1.25; }
+@media (max-width: 699px) {
+  .time input { font-size: 16px; font-size: clamp(2.4rem, 14vw, 3.4rem); }
 }
-.time-edit-field input:focus { box-shadow: 0 0 0 3px var(--green); }
-.time-edit-label { font-size: .7rem; font-weight: 800; color: var(--grey); }
 
 .timer-adj {
   width: 44px; height: 44px; font-size: 1.5rem; line-height: 1;
@@ -608,3 +597,8 @@ li.done .t-text { text-decoration: line-through; color: var(--grey); }
 
 /* Prevent body scroll when modal open */
 body.modal-open { overflow: hidden; position: fixed; width: 100%; }
+
+/* ===== HIDE PHONE-ONLY ELEMENTS ON DESKTOP/TABLET (>= 700px) ===== */
+@media (min-width: 700px) {
+  .tabbar, #tabbar, .fab, #fab, .sheet, #sheet, .sheet-overlay, #sheet-overlay, .chips, #chips { display: none !important; }
+}

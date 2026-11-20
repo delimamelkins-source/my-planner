@@ -730,6 +730,59 @@ try { alarmOn = localStorage.getItem('planner-alarm') !== 'off'; } catch (e) {}
 
 let ringTimer = null, ringStop = null, ringing = false;
 
+// New: three input elements for H:MM:SS
+const tH = document.getElementById('t-h');
+const tM = document.getElementById('t-m');
+const tS = document.getElementById('t-s');
+const pad2 = (n) => String(n).padStart(2, '0');
+
+// show a number of seconds in the 3 boxes
+function paintTime(totalSec) {
+  const s = Math.max(0, Math.round(totalSec));
+  tH.value = pad2(Math.floor(s / 3600));
+  tM.value = pad2(Math.floor((s % 3600) / 60));
+  tS.value = pad2(s % 60);
+}
+
+// read the 3 boxes as total seconds (clamped: h 0-23, m 0-59, s 0-59, total 1 second to 24 hours)
+function readTime() {
+  const h = Math.min(23, Math.max(0, parseInt(tH.value, 10) || 0));
+  const m = Math.min(59, Math.max(0, parseInt(tM.value, 10) || 0));
+  const s = Math.min(59, Math.max(0, parseInt(tS.value, 10) || 0));
+  return Math.max(1, h * 3600 + m * 60 + s);
+}
+
+// commit an edit: update the timer length and the saved length for the current mode
+function commitTimeEdit() {
+  if (timerRunning) return;
+  const total = readTime();
+  paintTime(total);
+  timerRemaining = total * 1000;
+  setModeLength(currentMode, total);
+  // Update progress bar to full
+  const bar = $('progress-bar');
+  if (bar) bar.style.width = '100%';
+}
+
+[tH, tM, tS].forEach((el, i, all) => {
+  el.addEventListener('focus', () => el.select());
+  el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, '').slice(0, 2); });
+  el.addEventListener('blur', commitTimeEdit);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commitTimeEdit(); el.blur(); }
+    else if (e.key === 'Escape') { paintTime(getModeLength(currentMode)); el.blur(); }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const max = i === 0 ? 23 : 59, d = e.key === 'ArrowUp' ? 1 : -1;
+      el.value = pad2(Math.min(max, Math.max(0, (parseInt(el.value, 10) || 0) + d)));
+      commitTimeEdit();
+    }
+  });
+});
+
+// lock the boxes while running, unlock when paused/finished/reset
+function setTimeEditable(editable) { [tH, tM, tS].forEach((el) => { el.disabled = !editable; }); }
+
 function paintAlarmBtn() {
   if (!alarmBtn) return;
   alarmBtn.classList.toggle('off', !alarmOn && !ringing);
@@ -790,7 +843,7 @@ function loadTimerPrefs() {
   } catch (e) {}
   updateModeButtons();
   paintAlarmBtn();
-  updateTimeDisplay();
+  paintTime(getModeLength(currentMode));
 }
 
 function saveTimerPrefs() {
@@ -869,11 +922,13 @@ function tick() {
     clearInterval(timerTick);
     timerTick = null;
     $('start').textContent = 'Start';
-    updateTimeDisplay();
+    const fullSec = getModeLength(currentMode);
+    paintTime(fullSec);
+    setTimeEditable(true);
     timerFinished();
     return;
   }
-  updateTimeDisplay();
+  paintTime(Math.max(0, Math.ceil(rem / 1000)));
   updateTabTitle();
 }
 
@@ -881,7 +936,7 @@ function timerFinished() {
   startAlarm();
   // Reset to mode's full length for next run
   timerRemaining = getModeLength(currentMode) * 1000;
-  updateTimeDisplay();
+  paintTime(getModeLength(currentMode));
 
   showMessage({
     title: 'Timer',
@@ -913,7 +968,7 @@ async function switchMode(mode, force = false) {
   currentMode = mode;
   updateModeButtons();
   timerRemaining = getModeLength(currentMode) * 1000;
-  updateTimeDisplay();
+  paintTime(timerRemaining / 1000);
 }
 
 function stopTimer() {
@@ -923,12 +978,15 @@ function stopTimer() {
   timerRemaining = Math.max(0, timerEnd - Date.now());
   timerEnd = null;
   $('start').textContent = 'Start';
-  updateTimeDisplay();
+  paintTime(Math.max(0, Math.ceil(timerRemaining / 1000)));
   updateTabTitle();
+  setTimeEditable(true);
 }
 
 function startTimer() {
   if (timerRunning) { stopTimer(); return; }
+  // Commit any pending edit if a box is focused
+  [tH, tM, tS].forEach(el => { if (document.activeElement === el) el.blur(); });
 
   // Request notification permission on first start
   if (Notification.permission === 'default') {
@@ -939,6 +997,7 @@ function startTimer() {
   timerRunning = true;
   timerEnd = Date.now() + timerRemaining;
   $('start').textContent = 'Pause';
+  setTimeEditable(false);
   tick();
   timerTick = setInterval(tick, 250);
 }
@@ -947,7 +1006,8 @@ function resetTimer() {
   stopTimer();
   stopAlarm();
   timerRemaining = getModeLength(currentMode) * 1000;
-  updateTimeDisplay();
+  paintTime(timerRemaining / 1000);
+  setTimeEditable(true);
 }
 
 /* ----- Event handlers ----- */
@@ -983,7 +1043,7 @@ function adjStep(delta) {
   const newSec = Math.max(1, Math.min(24 * 3600, currentSec + delta * step));
   timerRemaining = newSec * 1000;
   setModeLength(currentMode, newSec);
-  updateTimeDisplay();
+  paintTime(newSec);
 }
 
 function startAdjRepeat(delta) {
@@ -1003,88 +1063,6 @@ $('timer-inc').onmousedown = (e) => { e.preventDefault(); startAdjRepeat(1); };
 $('timer-inc').onmouseup = $('timer-inc').onmouseleave = stopAdjRepeat;
 $('timer-inc').ontouchstart = (e) => { e.preventDefault(); startAdjRepeat(1); };
 $('timer-inc').ontouchend = $('timer-inc').ontouchcancel = stopAdjRepeat;
-
-// Click time to edit - shows 3 inputs: Hours, Minutes, Seconds
-const timeEl = $('time');
-let editing = false;
-
-timeEl.onclick = () => {
-  if (timerRunning || editing) return;
-  startEdit();
-};
-
-timeEl.onkeydown = (e) => {
-  if (e.key === 'Enter' && !timerRunning) startEdit();
-  else if (e.key === 'Escape' && editing) cancelEdit();
-};
-
-function startEdit() {
-  editing = true;
-  const currentSec = Math.round(timerRemaining / 1000) || getModeLength(currentMode);
-  const h = Math.floor(currentSec / 3600);
-  const m = Math.floor((currentSec % 3600) / 60);
-  const s = currentSec % 60;
-
-  timeEl.innerHTML = `
-    <div class="time-edit">
-      <div class="time-edit-field">
-        <input type="number" min="0" max="23" value="${h}" aria-label="Hours" data-field="h">
-        <span class="time-edit-label">h</span>
-      </div>
-      <div class="time-edit-field">
-        <input type="number" min="0" max="59" value="${m}" aria-label="Minutes" data-field="m">
-        <span class="time-edit-label">m</span>
-      </div>
-      <div class="time-edit-field">
-        <input type="number" min="0" max="59" value="${s}" aria-label="Seconds" data-field="s">
-        <span class="time-edit-label">s</span>
-      </div>
-    </div>
-  `;
-  const inputs = timeEl.querySelectorAll('input');
-  inputs[0].focus();
-  inputs[0].select();
-
-  function finishEdit() {
-    const hVal = Math.max(0, Math.min(23, parseInt(inputs[0].value, 10) || 0));
-    const mVal = Math.max(0, Math.min(59, parseInt(inputs[1].value, 10) || 0));
-    const sVal = Math.max(0, Math.min(59, parseInt(inputs[2].value, 10) || 0));
-    const totalSec = hVal * 3600 + mVal * 60 + sVal;
-
-    if (totalSec >= 1 && totalSec <= 24 * 3600) {
-      timerRemaining = totalSec * 1000;
-      setModeLength(currentMode, totalSec);
-    }
-    editing = false;
-    updateTimeDisplay();
-  }
-
-  inputs.forEach((input, i) => {
-    input.onblur = finishEdit;
-    input.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        finishEdit();
-      } else if (e.key === 'Escape') {
-        editing = false;
-        updateTimeDisplay();
-      } else if (e.key === 'Tab' && !e.shiftKey && i < inputs.length - 1) {
-        inputs[i + 1].focus();
-        inputs[i + 1].select();
-        e.preventDefault();
-      } else if (e.key === 'Tab' && e.shiftKey && i > 0) {
-        inputs[i - 1].focus();
-        inputs[i - 1].select();
-        e.preventDefault();
-      }
-    };
-  });
-}
-
-function cancelEdit() {
-  editing = false;
-  updateTimeDisplay();
-}
 
 // Init timer prefs on load
 loadTimerPrefs();
