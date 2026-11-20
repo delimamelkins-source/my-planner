@@ -161,8 +161,78 @@ li.done .t-text { text-decoration: line-through; color: var(--grey); }
 .modes { display: flex; gap: 6px; margin-bottom: 10px; }
 .mode { flex: 1; background: var(--cream); border: 3px solid var(--ink); border-radius: 10px; padding: 4px 0; font-size: .8rem; }
 .mode.active { background: var(--ink); color: var(--cream); }
-.time { font-size: 3.2rem; font-weight: 900; text-align: center; margin: 4px 0 10px; letter-spacing: 1px; }
-.timer-btns { display: flex; gap: 10px; justify-content: center; }
+
+.timer-display { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; }
+.time-wrapper { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.time {
+  font-size: clamp(2.5rem, 10vw, 4rem); font-weight: 900; text-align: center;
+  min-width: 140px; letter-spacing: 1px; user-select: none; cursor: pointer;
+  background: var(--cream); border: 3px solid var(--ink); border-radius: 12px;
+  padding: 8px 16px; box-shadow: inset 3px 3px 0 var(--ink);
+  transition: box-shadow .1s, border-color .1s;
+}
+.time.long-format { font-size: clamp(1.8rem, 8vw, 3rem); }
+.time:focus, .time:hover { outline: none; box-shadow: inset 3px 3px 0 var(--ink), 0 0 0 3px var(--green); border-color: var(--green); }
+.time.editing { cursor: text; box-shadow: inset 3px 3px 0 var(--ink), 0 0 0 3px var(--green); }
+.time input {
+  width: 100%; border: none; background: transparent; font: inherit;
+  font-size: inherit; font-weight: 900; text-align: center; color: var(--ink);
+  letter-spacing: 1px; outline: none;
+}
+
+/* Time edit mode - 3 inputs: h, m, s */
+.time-edit { display: flex; align-items: center; gap: 4px; }
+.time-edit-field { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.time-edit-field input {
+  width: 56px; height: 56px; font-size: 1.5rem; font-weight: 900; text-align: center;
+  border: 3px solid var(--ink); border-radius: 10px; background: #fff; color: var(--ink);
+  font-family: inherit; outline: none;
+}
+.time-edit-field input:focus { box-shadow: 0 0 0 3px var(--green); }
+.time-edit-label { font-size: .7rem; font-weight: 800; color: var(--grey); }
+
+.timer-adj {
+  width: 44px; height: 44px; font-size: 1.5rem; line-height: 1;
+  padding: 0; display: flex; align-items: center; justify-content: center;
+}
+.timer-adj:disabled { opacity: .4; cursor: not-allowed; }
+
+.progress-wrap {
+  width: 100%; max-width: 280px; height: 6px;
+  background: var(--cream); border: 3px solid var(--ink); border-radius: 999px;
+  overflow: hidden; box-shadow: inset 2px 2px 0 var(--ink);
+}
+.progress-bar {
+  height: 100%; width: 100%; background: var(--ink);
+  border-radius: 999px; transition: width .25s linear;
+  transform-origin: left center;
+}
+
+.timer-btns { display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
+
+/* Alarm button */
+.alarm-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 7px 16px;
+}
+.alarm-btn .bell {
+  width: 20px; height: 20px; flex: none;
+  fill: var(--cream); stroke: var(--ink);
+  stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round;
+}
+.alarm-btn .slash { display: none; }
+.alarm-btn.off .slash { display: block; }
+.alarm-btn.off { color: var(--grey); }
+.alarm-btn.off .bell { fill: none; stroke: var(--grey); }
+
+.alarm-btn.ringing { background: var(--ink); color: var(--cream); }
+.alarm-btn.ringing .bell { fill: var(--cream); stroke: var(--cream); animation: ring .35s infinite; transform-origin: 50% 10%; }
+@keyframes ring {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-18deg); }
+  75% { transform: rotate(18deg); }
+}
+@media (prefers-reduced-motion: reduce) { .alarm-btn.ringing .bell { animation: none; } }
 
 /* ===== DESKTOP (>= 900px): fixed viewport layout ===== */
 @media (min-width: 900px) {
@@ -195,8 +265,135 @@ li.done .t-text { text-decoration: line-through; color: var(--grey); }
   .time { font-size: clamp(3rem, 9vh, 5rem); }
 }
 
-/* ===== MOBILE (< 900px): stacked, normal scroll ===== */
-@media (max-width: 899px) {
+/* ===== TABLET LANDSCAPE (700px-1366px, min-height 500px) ===== */
+@media (min-width: 700px) and (max-width: 1366px) and (orientation: landscape) and (min-height: 500px) {
+  html, body { height: 100%; overflow: hidden; }
+  .desktop {
+    max-width: none; width: 100%;
+    height: 100vh; height: 100dvh;
+    padding: 20px 20px 20px 16px;
+    display: grid;
+    grid-template-columns: 2fr 3fr;
+    gap: 24px;
+  }
+  .left-col {
+    order: 1;
+    display: grid;
+    grid-template-rows: 3fr 2fr;
+    gap: 24px;
+    min-height: 0;
+  }
+  .main {
+    order: 2;
+    height: auto;
+  }
+  .window { display: flex; flex-direction: column; min-height: 0; }
+  .body { flex: 1; min-height: 0; }
+  .pane, .sidebar { min-height: 0; }
+  #task-list, .side-scroll { overflow-y: auto; min-height: 0; }
+  .small-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .days { flex: 1; min-height: 0; }
+  .time { font-size: clamp(2.5rem, 8vh, 3.5rem); }
+  .weekdays span { font-size: .6rem; }
+  .day { font-size: .65rem; padding: 4px 2px; }
+  .day strong { font-size: .9rem; }
+  .modes { gap: 4px; }
+  .mode { font-size: .7rem; padding: 3px 0; }
+  .timer-btns { gap: 8px; }
+  .timer-btns .btn { padding: 5px 14px; font-size: .85rem; }
+  /* Narrower sidebar */
+  .body { grid-template-columns: 200px 1fr; }
+  .side-scroll { padding: 10px; }
+  .nav { font-size: .9rem; padding: 6px 10px; }
+  .tree button { font-size: .9rem; padding: 5px 4px; }
+  .pane-head { height: 44px; font-size: 1rem; padding: 0 12px; }
+  #task-list { padding: 12px; gap: 8px; }
+  #task-list li { padding: 8px 10px; gap: 10px; }
+  .check { width: 22px; height: 22px; }
+  #task-form { gap: 6px; padding: 8px 10px; }
+  #task-form input, #task-form select { padding: 5px 8px; font-size: .85rem; }
+}
+
+/* ===== TABLET PORTRAIT (700px-1099px) ===== */
+@media (min-width: 700px) and (max-width: 1099px) and (orientation: portrait) {
+  .desktop {
+    padding: 16px;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 100dvh;
+  }
+  .left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+  }
+  .main {
+    order: 1;
+    height: 55dvh;
+    min-height: 380px;
+    max-height: 55dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .main .window { display: flex; flex-direction: column; height: 100%; }
+  .main .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 220px 1fr; }
+  .main .sidebar { min-height: 0; }
+  .main .side-scroll { overflow-y: auto; }
+  .main #task-list { overflow-y: auto; min-height: 0; }
+  .left-col > .window.small:nth-child(1) {
+    order: 2;
+    flex: 0 0 60%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .left-col > .window.small:nth-child(2) {
+    order: 3;
+    flex: 0 0 40%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .left-col > .window.small .small-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .left-col > .window.small .days { flex: 1; min-height: 0; }
+  .time { font-size: clamp(2.5rem, 6vh, 3.5rem); }
+  .weekdays span { font-size: .6rem; }
+  .day { font-size: .65rem; padding: 4px 2px; }
+  .day strong { font-size: .9rem; }
+}
+
+/* ===== PHONE LANDSCAPE (max-height: 500px) ===== */
+@media (max-width: 699px) and (orientation: landscape) and (max-height: 500px) {
+  .desktop { padding: 8px 12px 12px; }
+  .left-col { gap: 12px; }
+  .main { min-height: 400px; }
+  .small-body { padding: 10px 12px 12px; }
+  .week-nav { margin-bottom: 4px; }
+  .weekdays { gap: 3px; margin-bottom: 2px; }
+  .weekdays span { font-size: .55rem; padding: 1px 0; }
+  .days { gap: 3px; }
+  .day { padding: 3px 2px; font-size: .6rem; }
+  .day strong { font-size: .8rem; }
+  .day .count { font-size: .55rem; }
+  .modes { gap: 4px; margin-bottom: 6px; }
+  .mode { font-size: .7rem; padding: 3px 0; }
+  .time { font-size: clamp(2rem, 10vh, 2.8rem); margin: 2px 0 6px; }
+  .timer-btns { gap: 6px; }
+  .timer-btns .btn { padding: 4px 12px; font-size: .8rem; }
+  .pane-head { height: 40px; font-size: 1rem; padding: 0 10px; }
+  #task-list { min-height: 160px; max-height: 220px; padding: 10px; gap: 6px; }
+  #task-list li { padding: 6px 8px; gap: 8px; }
+  .check { width: 20px; height: 20px; }
+  #task-form { gap: 4px; padding: 6px 8px; }
+  #task-form input, #task-form select { padding: 4px 6px; font-size: .8rem; }
+  .side-scroll { max-height: 160px; }
+}
+
+/* ===== MOBILE (< 700px): stacked, normal scroll ===== */
+@media (max-width: 699px) {
   .desktop { padding: 24px 14px 50px; max-width: 100%; }
   .left-col { display: flex; flex-direction: column; gap: 28px; }
   .main { height: auto; min-height: 560px; }
@@ -270,3 +467,55 @@ li.done .t-text { text-decoration: line-through; color: var(--grey); }
 /* Or divider for Google */
 .or-divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; font-size: .75rem; color: var(--grey); }
 .or-divider::before, .or-divider::after { content: ''; flex: 1; border-top: 2px solid var(--ink); }
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(43, 43, 38, 0.6);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; z-index: 1000;
+  animation: fadeIn .15s ease-out;
+}
+.modal-overlay.hidden { display: none; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-window {
+  width: 100%; max-width: 380px;
+  background: var(--cream); border: 3px solid var(--ink); border-radius: 18px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: slideUp .2s ease-out;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+
+.modal-titlebar {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  height: 46px; border-bottom: 3px solid var(--ink); font-size: 1.15rem; font-weight: 800;
+}
+.modal-titlebar .lights { position: absolute; right: 16px; display: flex; gap: 6px; }
+.modal-titlebar .lights i { width: 20px; height: 20px; border: 3px solid var(--ink); border-radius: 50%; background: var(--cream); display: block; cursor: pointer; }
+.modal-titlebar .lights i.fill { background: var(--ink); }
+.modal-titlebar .lights i:hover { background: var(--ink); }
+
+.modal-body { padding: 24px; }
+.modal-message { font-size: 1rem; margin-bottom: 16px; line-height: 1.4; }
+
+.modal-field { display: flex; flex-direction: column; gap: 6px; }
+.modal-field label { font-size: .85rem; font-weight: 800; }
+.modal-field input {
+  width: 100%; border: 3px solid var(--ink); border-radius: 10px; background: #fff;
+  padding: 12px; font-size: 1rem; font-family: inherit; font-weight: 700; color: var(--ink);
+}
+.modal-field input:focus { outline: none; }
+.modal-error { color: #c00; font-size: .85rem; margin-top: 4px; min-height: 1.2em; }
+
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.modal-btns .btn { min-height: 44px; padding: 10px 20px; font-size: .95rem; }
+
+/* Danger button style */
+.btn.danger { background: var(--ink); color: var(--cream); border-color: var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.btn.danger:hover { background: #1a1a16; }
+.btn.danger:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+
+/* Prevent body scroll when modal open */
+body.modal-open { overflow: hidden; position: fixed; width: 100%; }

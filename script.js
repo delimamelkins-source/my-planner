@@ -32,6 +32,143 @@ function esc(t) { const d = document.createElement('div'); d.textContent = t; re
 function showError(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
 function hideError(el) { el.classList.add('hidden'); }
 
+/* ---------- Modal Helpers ---------- */
+let modalResolve = null;
+let modalReject = null;
+let lastFocused = null;
+
+function openModal({ title, message, showInput = false, label = '', placeholder = '', confirmText = 'OK', cancelText = 'Cancel', danger = false, inputValue = '' }) {
+  return new Promise((resolve, reject) => {
+    modalResolve = resolve;
+    modalReject = reject;
+    lastFocused = document.activeElement;
+
+    $('modal-title').textContent = title;
+    $('modal-message').textContent = message || '';
+    $('modal-message').classList.toggle('hidden', !message);
+
+    const fieldWrapper = $('modal-field-wrapper');
+    const input = $('modal-input');
+    const labelEl = $('modal-label');
+    const errorEl = $('modal-error');
+    const btns = $('modal-btns');
+
+    if (showInput) {
+      fieldWrapper.classList.remove('hidden');
+      labelEl.textContent = label;
+      input.placeholder = placeholder;
+      input.value = inputValue;
+    } else {
+      fieldWrapper.classList.add('hidden');
+    }
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+
+    // Build buttons
+    btns.innerHTML = '';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn';
+    cancelBtn.textContent = cancelText;
+    cancelBtn.onclick = () => closeModal(null);
+    btns.appendChild(cancelBtn);
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.className = 'btn send' + (danger ? ' danger' : '');
+    confirmBtn.textContent = confirmText;
+    confirmBtn.onclick = () => {
+      if (showInput) {
+        const val = input.value.trim();
+        if (!val) {
+          showError(errorEl, 'This field is required');
+          input.focus();
+          return;
+        }
+        closeModal(val);
+      } else {
+        closeModal(true);
+      }
+    };
+    btns.appendChild(confirmBtn);
+
+    // Show modal
+    $('modal-overlay').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+
+    // Focus management
+    setTimeout(() => {
+      if (showInput) {
+        input.focus();
+        input.select();
+      } else {
+        confirmBtn.focus();
+      }
+    }, 0);
+
+    // Trap focus
+    document.addEventListener('keydown', trapFocus);
+    document.addEventListener('keydown', handleModalKeys);
+    $('modal-overlay').addEventListener('click', handleOverlayClick);
+    $('modal-close').addEventListener('click', () => closeModal(null));
+  });
+}
+
+function closeModal(value) {
+  document.removeEventListener('keydown', trapFocus);
+  document.removeEventListener('keydown', handleModalKeys);
+  $('modal-overlay').removeEventListener('click', handleOverlayClick);
+  $('modal-close').removeEventListener('click', () => closeModal(null));
+
+  $('modal-overlay').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+
+  if (lastFocused && lastFocused.focus) lastFocused.focus();
+
+  if (value === null) {
+    modalReject?.(null);
+  } else {
+    modalResolve?.(value);
+  }
+  modalResolve = modalReject = null;
+  lastFocused = null;
+}
+
+function trapFocus(e) {
+  if (e.key !== 'Tab') return;
+  const modal = $('modal-window');
+  const focusable = modal.querySelectorAll('button, input, [href], select, textarea, [tabindex]:not([tabindex="-1"])');
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+function handleModalKeys(e) {
+  if (e.key === 'Escape') { closeModal(null); }
+  else if (e.key === 'Enter') {
+    const btn = document.querySelector('.modal-btns .btn.send:not(:disabled)');
+    if (btn) btn.click();
+  }
+}
+
+function handleOverlayClick(e) {
+  if (e.target === $('modal-overlay')) closeModal(null);
+}
+
+// Public API
+async function askText({ title, label, placeholder, confirmText = 'Add', value = '' }) {
+  return openModal({ title, label, placeholder, confirmText, showInput: true, inputValue: value });
+}
+
+async function askConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', danger = false }) {
+  return openModal({ title, message, confirmText, cancelText, danger });
+}
+
+async function showMessage({ title, message }) {
+  return openModal({ title, message, confirmText: 'OK', cancelText: '' });
+}
+
 /* ---------- Auth UI ---------- */
 function showLogin() {
   $('login-screen').style.display = 'flex';
@@ -55,9 +192,15 @@ function showAuthForm(formId) {
     'forgot-form': 'Forgot Password',
     'reset-form': 'New Password'
   };
+  const errorIds = {
+    'login-form': 'login-error',
+    'signup-form': 'signup-error',
+    'forgot-form': 'forgot-error',
+    'reset-form': 'reset-error'
+  };
   $('auth-title').textContent = titles[formId];
   $('auth-back').classList.toggle('hidden', formId === 'login-form' && formId === 'signup-form');
-  hideError($('auth-error'));
+  hideError($(errorIds[formId]));
 }
 
 /* Storage adapter for remember me */
@@ -128,7 +271,7 @@ async function loadData() {
 
   } catch (e) {
     console.error('Load failed:', e);
-    alert('Failed to load data: ' + e.message);
+    await showMessage({ title: 'Error', message: 'Failed to load data: ' + e.message });
   }
 }
 
@@ -143,7 +286,13 @@ async function maybeImportLegacy() {
   if (!legacy || !legacy.subjects?.length) return;
   if (state.subjects.length > 0) return; // already has data
 
-  if (!confirm('Import tasks from this browser?')) {
+  const shouldImport = await askConfirm({
+    title: 'Import Data',
+    message: 'Import tasks from this browser?',
+    confirmText: 'Import',
+    cancelText: 'Don\'t Import'
+  });
+  if (!shouldImport) {
     localStorage.removeItem(legacyKey);
     return;
   }
@@ -198,6 +347,8 @@ function renderSidebar() {
     const n = pending((t) => t.subject === s.id);
     b.innerHTML = `<span class="name"># ${esc(s.name)}</span>${n ? `<em class="badge">${n}</em>` : ''}`;
     b.onclick = () => { state.view = s.id; saveView(); render(); };
+    // Double-click to rename
+    b.ondblclick = (e) => { e.stopPropagation(); renameSubject(s.id); };
     li.appendChild(b);
     ul.appendChild(li);
   });
@@ -319,7 +470,7 @@ async function addSubject(name) {
     state.view = 'all';
     saveView();
     render();
-    alert('Failed to create subject: ' + error.message);
+    await showMessage({ title: 'Error', message: 'Failed to create subject: ' + error.message });
   }
 }
 
@@ -327,7 +478,14 @@ async function deleteSubject(subId) {
   const sub = state.subjects.find(s => s.id === subId);
   if (!sub) return;
   const n = state.tasks.filter(t => t.subject === subId).length;
-  if (!confirm(`Delete "${sub.name}"${n ? ` and its ${n} task${n > 1 ? 's' : ''}` : ''}?`)) return;
+  const confirmed = await askConfirm({
+    title: 'Delete Subject',
+    message: `Delete "${sub.name}"${n ? ` and its ${n} task${n > 1 ? 's' : ''}` : ''}?`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    danger: true
+  });
+  if (!confirmed) return;
 
   // Optimistic
   const oldSubjects = [...state.subjects];
@@ -343,7 +501,7 @@ async function deleteSubject(subId) {
     state.subjects = oldSubjects;
     state.tasks = oldTasks;
     render();
-    alert('Failed to delete subject: ' + error.message);
+    await showMessage({ title: 'Error', message: 'Failed to delete subject: ' + error.message });
   }
 }
 
@@ -359,7 +517,7 @@ async function addTask(text, subjectId, due, pri) {
   if (error) {
     state.tasks = state.tasks.filter(t => t.id !== newId);
     render();
-    alert('Failed to add task: ' + error.message);
+    await showMessage({ title: 'Error', message: 'Failed to add task: ' + error.message });
   }
 }
 
@@ -374,7 +532,7 @@ async function toggleDone(taskId, done) {
   if (error) {
     task.done = oldDone;
     render();
-    alert('Failed to update task: ' + error.message);
+    await showMessage({ title: 'Error', message: 'Failed to update task: ' + error.message });
   }
 }
 
@@ -389,7 +547,7 @@ async function deleteTask(taskId) {
   if (error) {
     state.tasks = oldTasks;
     render();
-    alert('Failed to delete task: ' + error.message);
+    await showMessage({ title: 'Error', message: 'Failed to delete task: ' + error.message });
   }
 }
 
@@ -412,7 +570,7 @@ $('login-form').addEventListener('submit', async (e) => {
   const email = $('login-email').value.trim();
   const password = $('login-password').value;
   const remember = $('remember-me').checked;
-  const errEl = $('auth-error');
+  const errEl = $('login-error');
   const btn = $('login-submit');
   hideError(errEl);
   btn.classList.add('loading');
@@ -444,7 +602,7 @@ $('signup-form').addEventListener('submit', async (e) => {
   const email = $('signup-email').value.trim();
   const password = $('signup-password').value;
   const confirm = $('signup-confirm').value;
-  const errEl = $('auth-error');
+  const errEl = $('signup-error');
   const btn = $('signup-submit');
   hideError(errEl);
   btn.classList.add('loading');
@@ -479,7 +637,7 @@ $('switch-login').onclick = (e) => { e.preventDefault(); showAuthForm('login-for
 $('forgot-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = $('forgot-email').value.trim();
-  const errEl = $('auth-error');
+  const errEl = $('forgot-error');
   const btn = $('forgot-submit');
   hideError(errEl);
   btn.classList.add('loading');
@@ -507,7 +665,7 @@ $('reset-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const password = $('reset-password').value;
   const confirm = $('reset-confirm').value;
-  const errEl = $('auth-error');
+  const errEl = $('reset-error');
   const btn = $('reset-submit');
   hideError(errEl);
   btn.classList.add('loading');
@@ -537,39 +695,458 @@ $('auth-back').onclick = () => {
 };
 
 /* ---------- Focus timer ---------- */
-let total = 25 * 60, left = total, ticking = null;
-const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-function showTime() { $('time').textContent = fmt(left); document.title = ticking ? `${fmt(left)} · My Planner` : 'My Planner'; }
-function stop() { clearInterval(ticking); ticking = null; $('start').textContent = 'Start'; }
-$('start').onclick = () => {
-  if (ticking) { stop(); showTime(); return; }
-  $('start').textContent = 'Pause';
-  ticking = setInterval(() => {
-    left--;
-    if (left <= 0) { left = 0; stop(); showTime(); alert('Time is up! ✿'); return; }
-    showTime();
-  }, 1000);
+// Timer state
+let timerEnd = null;           // end timestamp (ms)
+let timerRemaining = 0;        // remaining ms when paused
+let timerTick = null;          // setInterval id
+let timerRunning = false;
+
+// Preset lengths (seconds) - loaded from localStorage
+const PRESET_KEY = 'my-planner-timer-presets';
+let presets = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 };
+let currentMode = 'focus';     // 'focus' | 'short' | 'long'
+
+// Audio
+let audioCtx = null;
+
+// Tab title flashing
+let flashInterval = null;
+const originalTitle = 'My Planner';
+
+// Alarm button state
+const alarmBtn = document.getElementById('alarm-btn');
+const alarmLabel = document.getElementById('alarm-label');
+let alarmOn = true;
+try { alarmOn = localStorage.getItem('planner-alarm') !== 'off'; } catch (e) {}
+
+let ringTimer = null, ringStop = null, ringing = false;
+
+function paintAlarmBtn() {
+  if (!alarmBtn) return;
+  alarmBtn.classList.toggle('off', !alarmOn && !ringing);
+  alarmBtn.classList.toggle('ringing', ringing);
+  alarmBtn.setAttribute('aria-pressed', String(alarmOn));
+  if (alarmLabel) alarmLabel.textContent = ringing ? 'Stop alarm' : (alarmOn ? 'Alarm: ON' : 'Alarm: OFF');
+}
+
+function unlockAudio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) {}
+}
+
+function beep(at) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'square'; o.frequency.value = 880;
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(0.25, at + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(at); o.stop(at + 0.18);
+}
+
+function startAlarm() {
+  if (!alarmOn) return;
+  unlockAudio();
+  if (!audioCtx) return;
+  ringing = true; paintAlarmBtn();
+  const pattern = () => { const t = audioCtx.currentTime; beep(t); beep(t + 0.25); beep(t + 0.5); };
+  pattern();
+  ringTimer = setInterval(pattern, 1500);
+  ringStop = setTimeout(stopAlarm, 60000);
+  if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+}
+
+function stopAlarm() {
+  clearInterval(ringTimer); clearTimeout(ringStop);
+  ringTimer = ringStop = null;
+  ringing = false; paintAlarmBtn();
+  if (navigator.vibrate) navigator.vibrate(0);
+}
+
+// Load presets from localStorage
+function loadTimerPrefs() {
+  try {
+    const saved = localStorage.getItem(PRESET_KEY);
+    if (saved) {
+      const p = JSON.parse(saved);
+      // Migrate old minute-based values to seconds
+      for (const k of Object.keys(p)) {
+        if (p[k] < 1000) p[k] *= 60; // values < 1000 were minutes
+      }
+      presets = { ...presets, ...p };
+    }
+  } catch (e) {}
+  updateModeButtons();
+  paintAlarmBtn();
+  updateTimeDisplay();
+}
+
+function saveTimerPrefs() {
+  try { localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); } catch (e) {}
+}
+
+// Format seconds to H:MM:SS (if >= 1h) or MM:SS
+const fmtSec = (sec) => {
+  const totalSec = Math.max(0, Math.ceil(sec));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
-$('reset').onclick = () => { stop(); left = total; showTime(); };
-document.querySelectorAll('.mode').forEach((b) => {
-  b.onclick = () => {
-    document.querySelectorAll('.mode').forEach((x) => x.classList.remove('active'));
-    b.classList.add('active');
-    stop(); total = left = Number(b.dataset.min) * 60; showTime();
-  };
+
+function getModeLength(mode) {
+  return presets[mode] || presets.focus;
+}
+
+function setModeLength(mode, seconds) {
+  const clamped = Math.max(1, Math.min(24 * 3600, Math.round(seconds)));
+  presets[mode] = clamped;
+  saveTimerPrefs();
+}
+
+function updateModeButtons() {
+  document.querySelectorAll('.mode').forEach(b => {
+    const mode = b.dataset.mode;
+    b.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+    b.classList.toggle('active', mode === currentMode);
+  });
+}
+
+function updateTimeDisplay() {
+  const totalSec = getModeLength(currentMode);
+  const remainingSec = timerRunning ? Math.max(0, Math.ceil((timerEnd - Date.now()) / 1000)) : Math.ceil(timerRemaining / 1000);
+  const displaySec = timerRunning ? remainingSec : totalSec;
+  $('time').textContent = fmtSec(displaySec);
+
+  // Add/remove long-format class for font scaling
+  $('time').classList.toggle('long-format', displaySec >= 3600);
+
+  // Progress bar
+  const bar = $('progress-bar');
+  if (bar) {
+    const totalMs = getModeLength(currentMode) * 1000;
+    const remMs = timerRunning ? Math.max(0, timerEnd - Date.now()) : timerRemaining || totalMs;
+    const pct = totalMs > 0 ? (remMs / totalMs) * 100 : 100;
+    bar.style.width = `${pct}%`;
+  }
+
+  // +/- buttons disabled when running
+  $('timer-dec').disabled = timerRunning;
+  $('timer-inc').disabled = timerRunning;
+}
+
+function updateTabTitle() {
+  if (timerRunning) {
+    const rem = Math.max(0, Math.ceil((timerEnd - Date.now()) / 1000));
+    document.title = `${fmtSec(rem)} - ${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)}`;
+  } else {
+    document.title = originalTitle;
+  }
+}
+
+// Timer tick (250ms)
+function tick() {
+  if (!timerRunning) return;
+  const rem = timerEnd - Date.now();
+  if (rem <= 0) {
+    timerRunning = false;
+    timerEnd = null;
+    clearInterval(timerTick);
+    timerTick = null;
+    $('start').textContent = 'Start';
+    updateTimeDisplay();
+    timerFinished();
+    return;
+  }
+  updateTimeDisplay();
+  updateTabTitle();
+}
+
+function timerFinished() {
+  startAlarm();
+  // Reset to mode's full length for next run
+  timerRemaining = getModeLength(currentMode) * 1000;
+  updateTimeDisplay();
+
+  showMessage({
+    title: 'Timer',
+    message: 'Time\'s up! ✿',
+    confirmText: 'Stop alarm',
+    cancelText: 'Start Short Break'
+  }).then(() => {
+    stopAlarm();
+  }).catch(() => {
+    stopAlarm();
+    // Start short break
+    switchMode('short', true);
+  });
+}
+
+async function switchMode(mode, force = false) {
+  if (timerRunning && !force) {
+    const ok = await askConfirm({
+      title: 'Stop Timer?',
+      message: 'Switching modes will stop the current timer.',
+      confirmText: 'Stop & Switch',
+      cancelText: 'Cancel',
+      danger: false
+    });
+    if (!ok) return;
+  }
+  stopTimer();
+  stopAlarm(); // stop ringing if mode changes while ringing
+  currentMode = mode;
+  updateModeButtons();
+  timerRemaining = getModeLength(currentMode) * 1000;
+  updateTimeDisplay();
+}
+
+function stopTimer() {
+  if (!timerRunning) return;
+  timerRunning = false;
+  if (timerTick) { clearInterval(timerTick); timerTick = null; }
+  timerRemaining = Math.max(0, timerEnd - Date.now());
+  timerEnd = null;
+  $('start').textContent = 'Start';
+  updateTimeDisplay();
+  updateTabTitle();
+}
+
+function startTimer() {
+  if (timerRunning) { stopTimer(); return; }
+
+  // Request notification permission on first start
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
+  }
+
+  unlockAudio(); // prime audio on first click
+  timerRunning = true;
+  timerEnd = Date.now() + timerRemaining;
+  $('start').textContent = 'Pause';
+  tick();
+  timerTick = setInterval(tick, 250);
+}
+
+function resetTimer() {
+  stopTimer();
+  stopAlarm();
+  timerRemaining = getModeLength(currentMode) * 1000;
+  updateTimeDisplay();
+}
+
+/* ----- Event handlers ----- */
+$('start').onclick = () => {
+  startTimer();
+};
+
+$('reset').onclick = resetTimer;
+
+// Alarm button
+if (alarmBtn) {
+  alarmBtn.addEventListener('click', () => {
+    unlockAudio();
+    if (ringing) { stopAlarm(); return; }
+    alarmOn = !alarmOn;
+    try { localStorage.setItem('planner-alarm', alarmOn ? 'on' : 'off'); } catch (e) {}
+    paintAlarmBtn();
+    if (alarmOn && audioCtx) beep(audioCtx.currentTime);
+  });
+}
+
+// Mode buttons
+document.querySelectorAll('.mode').forEach(b => {
+  b.onclick = () => switchMode(b.dataset.mode);
 });
+
+// +/- buttons (hold to repeat)
+let adjTimer = null;
+function adjStep(delta) {
+  if (timerRunning) return;
+  const currentSec = timerRemaining / 1000 || getModeLength(currentMode);
+  const step = currentSec >= 3600 ? 300 : 60; // 5 min at 1h+, 1 min under
+  const newSec = Math.max(1, Math.min(24 * 3600, currentSec + delta * step));
+  timerRemaining = newSec * 1000;
+  setModeLength(currentMode, newSec);
+  updateTimeDisplay();
+}
+
+function startAdjRepeat(delta) {
+  adjStep(delta);
+  adjTimer = setInterval(() => adjStep(delta), 200);
+}
+function stopAdjRepeat() {
+  if (adjTimer) { clearInterval(adjTimer); adjTimer = null; }
+}
+
+$('timer-dec').onmousedown = (e) => { e.preventDefault(); startAdjRepeat(-1); };
+$('timer-dec').onmouseup = $('timer-dec').onmouseleave = stopAdjRepeat;
+$('timer-dec').ontouchstart = (e) => { e.preventDefault(); startAdjRepeat(-1); };
+$('timer-dec').ontouchend = $('timer-dec').ontouchcancel = stopAdjRepeat;
+
+$('timer-inc').onmousedown = (e) => { e.preventDefault(); startAdjRepeat(1); };
+$('timer-inc').onmouseup = $('timer-inc').onmouseleave = stopAdjRepeat;
+$('timer-inc').ontouchstart = (e) => { e.preventDefault(); startAdjRepeat(1); };
+$('timer-inc').ontouchend = $('timer-inc').ontouchcancel = stopAdjRepeat;
+
+// Click time to edit - shows 3 inputs: Hours, Minutes, Seconds
+const timeEl = $('time');
+let editing = false;
+
+timeEl.onclick = () => {
+  if (timerRunning || editing) return;
+  startEdit();
+};
+
+timeEl.onkeydown = (e) => {
+  if (e.key === 'Enter' && !timerRunning) startEdit();
+  else if (e.key === 'Escape' && editing) cancelEdit();
+};
+
+function startEdit() {
+  editing = true;
+  const currentSec = Math.round(timerRemaining / 1000) || getModeLength(currentMode);
+  const h = Math.floor(currentSec / 3600);
+  const m = Math.floor((currentSec % 3600) / 60);
+  const s = currentSec % 60;
+
+  timeEl.innerHTML = `
+    <div class="time-edit">
+      <div class="time-edit-field">
+        <input type="number" min="0" max="23" value="${h}" aria-label="Hours" data-field="h">
+        <span class="time-edit-label">h</span>
+      </div>
+      <div class="time-edit-field">
+        <input type="number" min="0" max="59" value="${m}" aria-label="Minutes" data-field="m">
+        <span class="time-edit-label">m</span>
+      </div>
+      <div class="time-edit-field">
+        <input type="number" min="0" max="59" value="${s}" aria-label="Seconds" data-field="s">
+        <span class="time-edit-label">s</span>
+      </div>
+    </div>
+  `;
+  const inputs = timeEl.querySelectorAll('input');
+  inputs[0].focus();
+  inputs[0].select();
+
+  function finishEdit() {
+    const hVal = Math.max(0, Math.min(23, parseInt(inputs[0].value, 10) || 0));
+    const mVal = Math.max(0, Math.min(59, parseInt(inputs[1].value, 10) || 0));
+    const sVal = Math.max(0, Math.min(59, parseInt(inputs[2].value, 10) || 0));
+    const totalSec = hVal * 3600 + mVal * 60 + sVal;
+
+    if (totalSec >= 1 && totalSec <= 24 * 3600) {
+      timerRemaining = totalSec * 1000;
+      setModeLength(currentMode, totalSec);
+    }
+    editing = false;
+    updateTimeDisplay();
+  }
+
+  inputs.forEach((input, i) => {
+    input.onblur = finishEdit;
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finishEdit();
+      } else if (e.key === 'Escape') {
+        editing = false;
+        updateTimeDisplay();
+      } else if (e.key === 'Tab' && !e.shiftKey && i < inputs.length - 1) {
+        inputs[i + 1].focus();
+        inputs[i + 1].select();
+        e.preventDefault();
+      } else if (e.key === 'Tab' && e.shiftKey && i > 0) {
+        inputs[i - 1].focus();
+        inputs[i - 1].select();
+        e.preventDefault();
+      }
+    };
+  });
+}
+
+function cancelEdit() {
+  editing = false;
+  updateTimeDisplay();
+}
+
+// Init timer prefs on load
+loadTimerPrefs();
+
+// Expose for debugging
+window.__timerDebug = { presets, get currentMode() { return currentMode; }, get running() { return timerRunning; } };
 
 /* ---------- Events ---------- */
 $('nav-all').onclick = () => { state.view = 'all'; saveView(); render(); };
-$('add-subject').onclick = () => {
-  const name = (prompt('Subject name?') || '').trim();
-  if (!name) return;
-  addSubject(name);
+$('add-subject').onclick = async () => {
+  while (true) {
+    const name = await askText({
+      title: 'New Subject',
+      label: 'Subject name',
+      placeholder: 'e.g. ITP 131 - Networking 2',
+      confirmText: 'Add'
+    }).catch(() => null);
+    if (name === null) return; // cancelled
+    if (!name.trim()) continue; // empty - show error inside modal
+    // Check for duplicate
+    if (state.subjects.some(s => s.name.toLowerCase() === name.trim().toLowerCase())) {
+      // Show error inside modal by reopening with error - but we need a different approach
+      // We'll handle this by just showing message and retrying
+      await showMessage({ title: 'Error', message: 'A subject with this name already exists' });
+      continue;
+    }
+    addSubject(name);
+    break;
+  }
 };
 $('del-subject').onclick = () => {
   if (state.view === 'all') return;
   deleteSubject(state.view);
 };
+$('rename-subject').onclick = () => {
+  if (state.view === 'all') return;
+  renameSubject(state.view);
+};
+
+async function renameSubject(subId) {
+  const sub = state.subjects.find(s => s.id === subId);
+  if (!sub) return;
+  while (true) {
+    const name = await askText({
+      title: 'Rename Subject',
+      label: 'Subject name',
+      placeholder: 'e.g. ITP 131 - Networking 2',
+      confirmText: 'Save',
+      value: sub.name
+    }).catch(() => null);
+    if (name === null) return; // cancelled
+    if (!name.trim()) continue; // empty - show error inside modal
+    // Check for duplicate (excluding current)
+    if (state.subjects.some(s => s.id !== subId && s.name.toLowerCase() === name.trim().toLowerCase())) {
+      await showMessage({ title: 'Error', message: 'A subject with this name already exists' });
+      continue;
+    }
+    // Optimistic update
+    const oldName = sub.name;
+    sub.name = name.trim();
+    render();
+
+    const { error } = await sb.from('subjects').update({ name: name.trim() }).eq('id', subId);
+    if (error) {
+      sub.name = oldName;
+      render();
+      await showMessage({ title: 'Error', message: 'Failed to rename subject: ' + error.message });
+    }
+    break;
+  }
+}
 $('task-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const text = $('task-input').value.trim();

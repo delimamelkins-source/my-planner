@@ -36,7 +36,7 @@
             </label>
             <a href="#" class="text-link" id="forgot-link">Forgot password?</a>
           </div>
-          <p class="error hidden" id="auth-error"></p>
+          <p class="error hidden" id="login-error"></p>
           <button type="submit" class="btn send full-width" id="login-submit">Log In</button>
           <p class="hint center auth-footer">Don't have an account? <a href="#" class="text-link" id="switch-signup">Sign Up</a></p>
         </form>
@@ -63,7 +63,7 @@
             <label for="signup-confirm">Confirm Password</label>
             <input type="password" id="signup-confirm" autocomplete="new-password" required placeholder="••••••••">
           </div>
-          <p class="error hidden" id="auth-error"></p>
+          <p class="error hidden" id="signup-error"></p>
           <button type="submit" class="btn send full-width" id="signup-submit">Sign Up</button>
           <p class="hint center auth-footer">Already have an account? <a href="#" class="text-link" id="switch-login">Log In</a></p>
         </form>
@@ -75,7 +75,7 @@
             <label for="forgot-email">Email</label>
             <input type="email" id="forgot-email" autocomplete="email" required placeholder="you@example.com">
           </div>
-          <p class="error hidden" id="auth-error"></p>
+          <p class="error hidden" id="forgot-error"></p>
           <button type="submit" class="btn send full-width" id="forgot-submit">Send reset link</button>
           <p class="hint center auth-footer"><a href="#" class="text-link" id="forgot-back">Back to Log In</a></p>
         </form>
@@ -91,7 +91,7 @@
             <label for="reset-confirm">Confirm New Password</label>
             <input type="password" id="reset-confirm" autocomplete="new-password" required placeholder="••••••••">
           </div>
-          <p class="error hidden" id="auth-error"></p>
+          <p class="error hidden" id="reset-error"></p>
           <button type="submit" class="btn send full-width" id="reset-submit">Update Password</button>
         </form>
       </div>
@@ -125,14 +125,29 @@
         </div>
         <div class="small-body">
           <div class="modes">
-            <button class="mode active" data-min="25">Focus</button>
-            <button class="mode" data-min="5">Short</button>
-            <button class="mode" data-min="15">Long</button>
+            <button class="mode active" data-mode="focus">Focus</button>
+            <button class="mode" data-mode="short">Short</button>
+            <button class="mode" data-mode="long">Long</button>
           </div>
-          <div class="time" id="time">25:00</div>
+          <div class="timer-display">
+            <div class="time-wrapper">
+              <button class="btn tiny timer-adj" id="timer-dec" aria-label="Decrease time" title="Decrease">−</button>
+              <span class="time" id="time" tabindex="0" role="button" aria-label="Tap to edit time">25:00</span>
+              <button class="btn tiny timer-adj" id="timer-inc" aria-label="Increase time" title="Increase">+</button>
+            </div>
+            <div class="progress-wrap" aria-hidden="true"><div class="progress-bar" id="progress-bar"></div></div>
+          </div>
           <div class="timer-btns">
             <button class="btn" id="start">Start</button>
             <button class="btn" id="reset">Reset</button>
+            <button type="button" id="alarm-btn" class="btn alarm-btn" aria-pressed="true">
+              <svg class="bell" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6z"/>
+                <path d="M10 19a2 2 0 0 0 4 0"/>
+                <path class="slash" d="M3 3l18 18"/>
+              </svg>
+              <span id="alarm-label">Alarm: ON</span>
+            </button>
           </div>
         </div>
       </section>
@@ -163,6 +178,7 @@
             <div class="pane-head">
               <b id="pane-title"># All tasks</b>
               <span class="stat" id="pane-stat"></span>
+              <button class="btn small" id="rename-subject" style="margin-right: 8px;">Rename</button>
               <button class="btn small" id="del-subject">Delete</button>
             </div>
             <ul id="task-list" class="scroll"></ul>
@@ -181,6 +197,26 @@
         </div>
       </section>
     </div>
+
+  <!-- Modal Overlay -->
+  <div class="modal-overlay hidden" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-window" id="modal-window">
+      <div class="modal-titlebar">
+        <span class="lights"><i class="fill"></i><i></i><i class="modal-close" id="modal-close" aria-label="Close"></i></span>
+        <b id="modal-title">Title</b>
+      </div>
+      <div class="modal-body">
+        <p id="modal-message" class="modal-message"></p>
+        <div class="modal-field hidden" id="modal-field-wrapper">
+          <label id="modal-label" for="modal-input"></label>
+          <input type="text" id="modal-input" autocomplete="off">
+          <p class="modal-error hidden" id="modal-error"></p>
+        </div>
+        <div class="modal-btns" id="modal-btns"></div>
+      </div>
+    </div>
+  </div>
+
   <script src="script.js"></script>
 </body>
 </html>
