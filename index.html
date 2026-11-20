@@ -101,7 +101,7 @@
   <!-- Planner app -->
   <div class="desktop" id="app" style="display: none;">
     <div class="left-col">
-      <section class="window small">
+      <section class="window small" data-panel="calendar">
         <div class="titlebar">
           <span class="lights"><i class="fill"></i><i></i><i></i></span>
           <b id="month-title">Month</b>
@@ -118,7 +118,7 @@
         </div>
       </section>
 
-      <section class="window small">
+      <section class="window small" data-panel="timer">
         <div class="titlebar">
           <span class="lights"><i class="fill"></i><i></i><i></i></span>
           <b>Focus</b>
@@ -153,12 +153,13 @@
       </section>
     </div>
 
-    <section class="window main">
+    <section class="window main" data-panel="tasks">
         <div class="titlebar">
           <span class="lights"><i class="fill"></i><i></i><i></i></span>
           <b>Planner</b>
-          <div class="user-info" id="user-info" style="position: absolute; right: 50px; top: 50%; transform: translateY(-50%);"></div>
+          <div class="user-info" id="user-info" style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%);"></div>
         </div>
+        <div class="user-email-line" id="user-email-line" hidden></div>
         <div class="body">
           <aside class="sidebar">
             <div class="toolbar">
@@ -181,6 +182,7 @@
               <button class="btn small" id="rename-subject" style="margin-right: 8px;">Rename</button>
               <button class="btn small" id="del-subject">Delete</button>
             </div>
+            <div id="chips" class="chips"></div>
             <ul id="task-list" class="scroll"></ul>
             <p class="empty" id="empty">Nothing here yet ✿</p>
             <form id="task-form">
@@ -196,6 +198,28 @@
           </div>
         </div>
       </section>
+
+    <!-- Phone: bottom tab bar -->
+    <nav class="tabbar" id="tabbar">
+      <button type="button" class="tab active" data-tab="tasks">Tasks</button>
+      <button type="button" class="tab" data-tab="calendar">Calendar</button>
+      <button type="button" class="tab" data-tab="timer">Timer</button>
+    </nav>
+
+    <!-- Phone: floating add button and add-task sheet -->
+    <button type="button" id="fab" class="fab" aria-label="Add task">+</button>
+    <div id="sheet-overlay" class="sheet-overlay" hidden></div>
+    <form id="sheet" class="sheet" hidden>
+      <div class="grab"></div>
+      <b id="sheet-title"># New task</b>
+      <input type="text" id="sheet-text" placeholder="Task name…" autocomplete="off" required>
+      <div class="two">
+        <select id="sheet-pri"><option value="low">Low</option><option value="mid" selected>Medium</option><option value="high">High</option></select>
+        <input type="date" id="sheet-due">
+      </div>
+      <p id="sheet-err" class="sheet-err"></p>
+      <div class="btnrow"><button type="button" class="btn" id="sheet-cancel">Cancel</button><button type="submit" class="btn dark">Add</button></div>
+    </form>
     </div>
 
   <!-- Modal Overlay -->

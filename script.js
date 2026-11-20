@@ -354,14 +354,18 @@ function renderSidebar() {
   });
   $('no-subjects').classList.toggle('hidden', state.subjects.length > 0);
 
-  // User info in titlebar (upper right)
+  // User info in titlebar (upper right) - desktop/tablet
   const ui = $('user-info');
+  // User email line under titlebar - phone
+  const emailLine = $('user-email-line');
   if (state.user?.email) {
-    ui.innerHTML = `<span style="font-size: .8rem; color: var(--grey); margin-right: 8px;">${esc(state.user.email)}</span>
-      <button class="btn" id="logout-btn" style="padding: 3px 8px; font-size: .75rem;">Log out</button>`;
+    ui.innerHTML = `<button class="btn" id="logout-btn" style="padding: 3px 8px; font-size: .75rem;">Log out</button>`;
+    emailLine.hidden = !phoneMQ.matches;
+    emailLine.textContent = state.user.email;
     $('logout-btn').onclick = () => sb.auth.signOut();
   } else {
     ui.innerHTML = '';
+    emailLine.hidden = true;
   }
 }
 
@@ -448,12 +452,17 @@ function renderMonth() {
     const b = document.createElement('button');
     b.className = 'day' + (isToday ? ' today' : '') + (isSelected ? ' selected' : '') + (!isCurrentMonth ? ' faded' : '');
     b.innerHTML = `<strong>${cellDate.getDate()}</strong>${n ? `<span class="count">● ${n}</span>` : ''}`;
-    b.onclick = () => { day = day === key ? null : key; render(); };
+    b.onclick = () => {
+      day = day === key ? null : key;
+      render();
+      // On phone, tap a day -> switch to Tasks tab to see filtered list
+      if (phoneMQ.matches && day) setTab('tasks');
+    };
     wrap.appendChild(b);
   }
 }
 
-function render() { renderSidebar(); renderTasks(); renderMonth(); }
+function render() { renderSidebar(); renderTasks(); renderMonth(); renderChips(); }
 
 /* ---------- Supabase mutations (optimistic) ---------- */
 async function addSubject(name) {
@@ -1157,6 +1166,95 @@ $('task-form').addEventListener('submit', (e) => {
 $('prev-month').onclick = () => { monthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1); renderMonth(); };
 $('next-month').onclick = () => { monthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1); renderMonth(); };
 $('today-btn').onclick = () => { monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1); day = todayStr; render(); };
+
+/* ---------- Phone layout ---------- */
+const phoneMQ = window.matchMedia('(max-width: 699px)');
+
+function setTab(tab) {
+  if (!phoneMQ.matches) return;
+  // Update tab bar
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  // Show/hide panels
+  document.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('active', p.dataset.panel === tab));
+  // FAB only on tasks tab (CSS uses display: grid)
+  $('fab').style.display = tab === 'tasks' ? 'grid' : 'none';
+}
+
+function renderChips() {
+  if (!phoneMQ.matches) return;
+  const chipsEl = $('chips');
+  if (!chipsEl) return;
+  chipsEl.innerHTML = '';
+  // All chip
+  const allChip = document.createElement('button');
+  allChip.className = 'chip' + (state.view === 'all' ? ' active' : '');
+  allChip.textContent = 'All';
+  allChip.onclick = () => { state.view = 'all'; saveView(); render(); };
+  chipsEl.appendChild(allChip);
+  // Subject chips
+  state.subjects.forEach(s => {
+    const chip = document.createElement('button');
+    chip.className = 'chip' + (state.view === s.id ? ' active' : '');
+    const n = pending((t) => t.subject === s.id);
+    chip.textContent = '# ' + esc(s.name) + (n ? ` (${n})` : '');
+    chip.onclick = () => { state.view = s.id; saveView(); render(); };
+    chipsEl.appendChild(chip);
+  });
+  // + Subject chip
+  const addChip = document.createElement('button');
+  addChip.className = 'chip';
+  addChip.textContent = '+ Subject';
+  addChip.onclick = () => $('add-subject').click();
+  chipsEl.appendChild(addChip);
+}
+
+/* Sheet (add task on phone) */
+function openSheet() {
+  $('sheet-overlay').hidden = false;
+  $('sheet').hidden = false;
+  $('sheet-text').value = '';
+  $('sheet-due').value = day || '';
+  $('sheet-pri').value = 'mid';
+  $('sheet-err').textContent = '';
+  setTimeout(() => $('sheet-text').focus(), 50);
+  // Lock body scroll
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSheet() {
+  $('sheet-overlay').hidden = true;
+  $('sheet').hidden = true;
+  document.body.style.overflow = '';
+}
+
+$('fab').onclick = openSheet;
+$('sheet-overlay').onclick = closeSheet;
+$('sheet-cancel').onclick = closeSheet;
+
+$('sheet').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = $('sheet-text').value.trim();
+  if (!text) { $('sheet-err').textContent = 'Enter a task name'; return; }
+  if (state.view === 'all') { $('sheet-err').textContent = 'Select a subject first'; return; }
+  addTask(text, state.view, $('sheet-due').value, $('sheet-pri').value);
+  closeSheet();
+});
+
+/* Tab click handlers */
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.onclick = () => setTab(btn.dataset.tab);
+});
+
+/* Listen for media query changes */
+phoneMQ.addEventListener('change', () => {
+  if (phoneMQ.matches) {
+    setTab('tasks');
+  } else {
+    // Reset desktop panels
+    document.querySelectorAll('[data-panel]').forEach(p => p.classList.remove('active'));
+    $('fab').style.display = 'none';
+  }
+});
 
 /* ---------- Init ---------- */
 tryAutoLogin(); showTime();
